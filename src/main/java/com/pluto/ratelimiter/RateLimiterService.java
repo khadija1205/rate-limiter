@@ -1,28 +1,33 @@
 package com.pluto.ratelimiter;
 
 import org.springframework.stereotype.Service;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class RateLimiterService {
-    private final Map<String, Integer> requestCounts = new HashMap<>();
+    private final ConcurrentHashMap<String, AtomicInteger> requestCounts = new ConcurrentHashMap<>();
     private static final int LIMIT = 10;
 
 
     public boolean allowRequest(String userId) {
-        int currentCount = requestCounts.getOrDefault(userId, 0);
+        AtomicInteger counter = requestCounts.computeIfAbsent(userId, key -> new AtomicInteger(0));
 
-        if(currentCount >= LIMIT) {
-            return false;
+
+        int newCount = counter.incrementAndGet();
+
+        if(newCount > LIMIT) {
+           counter.decrementAndGet();
+           return false;
         }
 
-        requestCounts.put(userId, currentCount + 1);
+
         return true;
 
     }
 
     public int getCurrentCount(String userId) { 
-        return requestCounts.getOrDefault(userId, 0);
+        AtomicInteger counter = requestCounts.get(userId);
+        return counter == null ? 0 : counter.get();
     }
 }
